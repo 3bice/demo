@@ -1,0 +1,70 @@
+name: CI
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up CMake
+        uses: jwlawson/actions-setup-cmake@v1
+        with:
+          cmake-version: '3.30.0'
+
+      - name: Install dependencies
+        run: |
+          if [ ${{ runner.os }} == 'Linux' ]; then
+            sudo apt-get update
+            sudo apt-get install -y \
+              libopencv-dev \
+              ffmpeg \
+              build-essential \
+              cmake \
+              pkg-config \
+              libjpeg-dev \
+              libpng-dev \
+              libtiff-dev \
+              libavcodec-dev \
+              libavformat-dev \
+              libswscale-dev
+            # Build static OpenCV and FFmpeg
+            git clone https://github.com/opencv/opencv.git
+            git clone https://github.com/opencv/opencv_contrib.git
+            cd opencv
+            mkdir build && cd build
+            cmake -D BUILD_SHARED_LIBS=OFF -D CMAKE_BUILD_TYPE=Release -D OPENCV_EXTRA_MODULES_PATH=../../opencv_contrib/modules ..
+            make -j$(nproc)
+            sudo make install
+            cd ../../ && rm -rf opencv opencv_contrib
+          elif [ ${{ runner.os }} == 'macOS' ]; then
+            brew install opencv --build-from-source --static
+            brew install ffmpeg --build-from-source --static
+          elif [ ${{ runner.os }} == 'Windows' ]; then
+            choco install opencv --params="'/Static'"
+            choco install ffmpeg --params="'/Static'"
+          fi
+
+      - name: Configure project
+        run: cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF .
+
+      - name: Build project
+        run: cmake --build .
+
+      - name: Package binaries
+        run: |
+          mkdir -p build_output
+          cp -r ./bin/* build_output/
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v1
+        with:
+          assets: build_output/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
