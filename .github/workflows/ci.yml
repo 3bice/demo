@@ -35,17 +35,17 @@ jobs:
               libavformat-dev \
               libswscale-dev
             # Build static OpenCV and FFmpeg
-            git clone https://github.com/opencv/opencv.git
-            git clone https://github.com/opencv/opencv_contrib.git
-            cd opencv
-            mkdir build && cd build
-            cmake -D BUILD_SHARED_LIBS=OFF -D CMAKE_BUILD_TYPE=Release -D OPENCV_EXTRA_MODULES_PATH=../../opencv_contrib/modules ..
-            make -j$(nproc)
-            sudo make install
-            cd ../../ && rm -rf opencv opencv_contrib
+#            git clone https://github.com/opencv/opencv.git
+#            git clone https://github.com/opencv/opencv_contrib.git
+#            cd opencv
+#            mkdir build && cd build
+#            cmake -D BUILD_SHARED_LIBS=OFF -D CMAKE_BUILD_TYPE=Release -D OPENCV_EXTRA_MODULES_PATH=../../opencv_contrib/modules ..
+#            make -j$(nproc)
+#            sudo make install
+#            cd ../../ && rm -rf opencv opencv_contrib
           elif [ ${{ runner.os }} == 'macOS' ]; then
-            brew install opencv --build-from-source --static
-            brew install ffmpeg --build-from-source --static
+            brew install opencv --build-from-source
+            brew install ffmpeg --build-from-source
           elif [ ${{ runner.os }} == 'Windows' ]; then
             choco install opencv --params="'/Static'"
             choco install ffmpeg --params="'/Static'"
