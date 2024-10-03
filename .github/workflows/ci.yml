@@ -1,66 +1,89 @@
 name: CI
 
-on: [push]
+on: [ push ]
 
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+  build-linux:
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Set up CMake
-        uses: jwlawson/actions-setup-cmake@v1
-        with:
-          cmake-version: '3.30.0'
-
-      - name: Set Swap Space
-        uses: pierotofy/set-swap-space@master
-        with:
-          swap-size-gb: 10
-
       - name: Install dependencies
         run: |
-          if [ ${{ runner.os }} == 'Linux' ]; then
-            sudo apt-get update
-            sudo apt-get install -y \
-              libopencv-dev \
-              ffmpeg \
-              build-essential \
-              cmake \
-              pkg-config \
-              libjpeg-dev \
-              libpng-dev \
-              libtiff-dev \
-              libavcodec-dev \
-              libavformat-dev \
-              libswscale-dev
-          elif [ ${{ runner.os }} == 'macOS' ]; then
-            brew install opencv --build-from-source
-            brew install ffmpeg --build-from-source
-          elif [ ${{ runner.os }} == 'Windows' ]; then
-            choco install opencv --params="'/Static'"
-            choco install ffmpeg --params="'/Static'"
-          fi
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake \
+            libavformat-dev libavcodec-dev libavutil-dev libswscale-dev \
+            libavdevice-dev libswresample-dev pkg-config
 
-      - name: Configure project
-        run: cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF .
-
-      - name: Build project
-        run: cmake --build .
-
-      - name: Package binaries
+      - name: Install vcpkg
         run: |
-          mkdir -p build_output
-          cp -r ./bin/* build_output/
+          git clone https://github.com/microsoft/vcpkg.git
+          ./vcpkg/bootstrap-vcpkg.sh
+          ./vcpkg/vcpkg install opencv:x64-linux-static ffmpeg:x64-linux-static
 
-      - name: Upload release assets
-        uses: softprops/action-gh-release@v1
-        with:
-          assets: build_output/*
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build with CMake
+        run: |
+          mkdir build
+          cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
+                    -DVCPKG_ROOT="$GITHUB_WORKSPACE/vcpkg" -DCMAKE_TOOLCHAIN_FILE="$GITHUB_WORKSPACE/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          make
+
+      - name: Run tests
+        run: |
+          cd build
+          make test
+
+  build-macos:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Install vcpkg
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git
+          ./vcpkg/bootstrap-vcpkg.sh
+          ./vcpkg/vcpkg install opencv:x64-osx-static ffmpeg:x64-osx-static
+
+      - name: Build with CMake
+        run: |
+          mkdir build
+          cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
+                    -DVCPKG_ROOT="$GITHUB_WORKSPACE/vcpkg" -DCMAKE_TOOLCHAIN_FILE="$GITHUB_WORKSPACE/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          make
+
+      - name: Run tests
+        run: |
+          cd build
+          make test
+
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Install vcpkg
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git
+          .\vcpkg\bootstrap-vcpkg.bat
+          .\vcpkg\vcpkg install opencv:x64-windows-static ffmpeg:x64-windows-static
+
+      - name: Build with CMake
+        run: |
+          mkdir build
+          cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
+                    -DVCPKG_ROOT="$GITHUB_WORKSPACE/vcpkg" -DCMAKE_TOOLCHAIN_FILE="$GITHUB_WORKSPACE/vcpkg/scripts/buildsystems/vcpkg.cmake"
+          cmake --build . --config Release
+
+      - name: Run tests
+        run: |
+          cd build
+          ctest --output-on-failure
