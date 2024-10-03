@@ -18,6 +18,11 @@ jobs:
         with:
           cmake-version: '3.30.0'
 
+      - name: Set Swap Space
+        uses: pierotofy/set-swap-space@master
+        with:
+          swap-size-gb: 10
+
       - name: Install dependencies
         run: |
           if [ ${{ runner.os }} == 'Linux' ]; then
@@ -34,7 +39,6 @@ jobs:
               libavcodec-dev \
               libavformat-dev \
               libswscale-dev
-          
           elif [ ${{ runner.os }} == 'macOS' ]; then
             brew install opencv --build-from-source
             brew install ffmpeg --build-from-source
